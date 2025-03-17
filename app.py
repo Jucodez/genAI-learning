@@ -1,35 +1,51 @@
-from langchain_openai import ChatOpenAI   
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-
-import streamlit as st
+from fastapi import FastAPI
+from langchain.prompts import ChatPromptTemplate
+from langchain.chat_models import ChatOpenAI
+from langserve import add_routes
+import uvicorn
 import os
+from langchain_community.llms import Ollama
 from dotenv import load_dotenv
+
 load_dotenv()
 
-os.environ["OPENAI_API_KEY"]=st.secrets["github"]["OPENAI_API_KEY"]
-## Langmith tracking
-os.environ["LANGCHAIN_TRACING_V2"]="true"
-os.environ["LANGCHAIN_API_KEY"]=st.secrets["github"]["LANGCHAIN_API_KEY"]
+os.environ['OPENAI_API_KEY']=os.getenv("OPENAI_API_KEY")
 
-## Prompt Template
+app=FastAPI(
+    title="Langchain Server",
+    version="1.0",
+    decsription="A simple API Server"
 
-prompt=ChatPromptTemplate.from_messages(
-    [
-        ("system","You are a helpful assistant. Please respond to the user queries"),
-        ("user","Question:{question}")
-    ]
 )
 
-## streamlit framework
+add_routes(
+    app,
+    ChatOpenAI(),
+    path="/openai"
+)
+model=ChatOpenAI()
+##ollama llama2
+llm=Ollama(model="llama2")
 
-st.title('Langchain Demo With OPENAI API')
-input_text=st.text_input("Search the topic u want")
+prompt1=ChatPromptTemplate.from_template("Write me an essay about {topic} with 100 words")
+prompt2=ChatPromptTemplate.from_template("Write me an poem about {topic} for a 5 years child with 100 words")
 
-# openAI LLm 
-llm=ChatOpenAI(model="gpt-3.5-turbo")
-output_parser=StrOutputParser()
-chain=prompt|llm|output_parser
+add_routes(
+    app,
+    prompt1|model,
+    path="/essay"
 
-if input_text:
-    st.write(chain.invoke({'question':input_text}))
+
+)
+
+add_routes(
+    app,
+    prompt2|llm,
+    path="/poem"
+
+
+)
+
+
+if __name__=="__main__":
+    uvicorn.run(app,host="localhost",port=8000)
